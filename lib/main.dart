@@ -1,3 +1,5 @@
+// lib/main.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +9,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'providers/spesa_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/statistiche_screen.dart';
+import 'screens/contatori_screen.dart';
 import 'screens/impostazioni_screen.dart';
 import 'screens/aggiungi_spesa_screen.dart';
 
@@ -33,7 +36,7 @@ class CasaSpeseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Casa Spese',
+      title: 'Spese Casa Niguarda',
       debugShowCheckedModeBanner: false,
       locale: const Locale('it', 'IT'),
       localizationsDelegates: const [
@@ -95,14 +98,15 @@ class MainScaffold extends StatefulWidget {
 class _MainScaffoldState extends State<MainScaffold> {
   int _currentIndex = 0;
   String? _selectedSpesaId;
-
   static const double _tabletBreakpoint = 720;
 
-  final _labels = ['Spese', 'Statistiche', 'Impostazioni'];
+  // Indici: 0=Spese, 1=Statistiche, 2=Contatori, 3=Impostazioni
+  final _labels = ['Spese', 'Statistiche', 'Contatori', 'Impostazioni'];
   final _icons = <(IconData, IconData)>[
-    (Icons.receipt_long_outlined, Icons.receipt_long),
-    (Icons.bar_chart_outlined, Icons.bar_chart),
-    (Icons.settings_outlined, Icons.settings),
+    (Icons.receipt_long_outlined,  Icons.receipt_long),
+    (Icons.bar_chart_outlined,     Icons.bar_chart),
+    (Icons.speed_outlined,         Icons.speed),
+    (Icons.settings_outlined,      Icons.settings),
   ];
 
   void _onDestinationSelected(int i) {
@@ -116,10 +120,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final isTablet = width >= _tabletBreakpoint;
-
-    if (isTablet) {
-      return _buildTabletLayout(context);
-    }
+    if (isTablet) return _buildTabletLayout(context);
     return _buildPhoneLayout(context);
   }
 
@@ -128,36 +129,29 @@ class _MainScaffoldState extends State<MainScaffold> {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          HomeScreen(
-            selectedSpesaId: null,
-            onSpesaSelected: (_) {},
-          ),
+          HomeScreen(selectedSpesaId: null, onSpesaSelected: (_) {}),
           const StatisticheScreen(),
+          const ContatoriScreen(),
           const ImpostazioniScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: _onDestinationSelected,
-        destinations: List.generate(
-          3,
-          (i) => NavigationDestination(
-            icon: Icon(_icons[i].$1),
-            selectedIcon: Icon(_icons[i].$2),
-            label: _labels[i],
-          ),
-        ),
+        destinations: List.generate(_labels.length, (i) => NavigationDestination(
+          icon: Icon(_icons[i].$1),
+          selectedIcon: Icon(_icons[i].$2),
+          label: _labels[i],
+        )),
       ),
     );
   }
 
   Widget _buildTabletLayout(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       body: Row(
         children: [
-          // NavigationRail sinistra
           NavigationRail(
             selectedIndex: _currentIndex,
             onDestinationSelected: _onDestinationSelected,
@@ -167,8 +161,7 @@ class _MainScaffoldState extends State<MainScaffold> {
             leading: Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Container(
-                width: 44,
-                height: 44,
+                width: 44, height: 44,
                 decoration: BoxDecoration(
                   color: const Color(0xFF2E7D32),
                   borderRadius: BorderRadius.circular(12),
@@ -176,46 +169,36 @@ class _MainScaffoldState extends State<MainScaffold> {
                 child: const Icon(Icons.home, color: Colors.white, size: 24),
               ),
             ),
-            destinations: List.generate(
-              3,
-              (i) => NavigationRailDestination(
-                icon: Icon(_icons[i].$1),
-                selectedIcon: Icon(_icons[i].$2),
-                label: Text(_labels[i]),
-              ),
-            ),
+            destinations: List.generate(_labels.length, (i) => NavigationRailDestination(
+              icon: Icon(_icons[i].$1),
+              selectedIcon: Icon(_icons[i].$2),
+              label: Text(_labels[i]),
+            )),
           ),
-
           const VerticalDivider(thickness: 1, width: 1),
-
-          // Contenuto
           Expanded(
             child: _currentIndex == 0
-                ? Row(
-                    children: [
-                      // Master: lista (38%)
-                      SizedBox(
-                        width: MediaQuery.of(context).size.width * 0.36,
-                        child: HomeScreen(
-                          selectedSpesaId: _selectedSpesaId,
-                          onSpesaSelected: (id) =>
-                              setState(() => _selectedSpesaId = id),
-                        ),
+                ? Row(children: [
+                    SizedBox(
+                      width: MediaQuery.of(context).size.width * 0.36,
+                      child: HomeScreen(
+                        selectedSpesaId: _selectedSpesaId,
+                        onSpesaSelected: (id) => setState(() => _selectedSpesaId = id),
                       ),
-                      const VerticalDivider(thickness: 1, width: 1),
-                      // Detail (resto)
-                      Expanded(
-                        child: _selectedSpesaId == null
-                            ? const _DetailPlaceholder()
-                            : SpesaDetailPanel(spesaId: _selectedSpesaId!),
-                      ),
-                    ],
-                  )
+                    ),
+                    const VerticalDivider(thickness: 1, width: 1),
+                    Expanded(
+                      child: _selectedSpesaId == null
+                          ? const _DetailPlaceholder()
+                          : SpesaDetailPanel(spesaId: _selectedSpesaId!),
+                    ),
+                  ])
                 : IndexedStack(
                     index: _currentIndex,
                     children: [
                       const SizedBox.shrink(),
                       const StatisticheScreen(),
+                      const ContatoriScreen(),
                       const ImpostazioniScreen(),
                     ],
                   ),
@@ -226,11 +209,8 @@ class _MainScaffoldState extends State<MainScaffold> {
   }
 }
 
-// ---- Placeholder dettaglio ----
-
 class _DetailPlaceholder extends StatelessWidget {
   const _DetailPlaceholder();
-
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -239,22 +219,14 @@ class _DetailPlaceholder extends StatelessWidget {
         children: [
           Icon(Icons.touch_app_outlined, size: 64, color: Colors.grey[300]),
           const SizedBox(height: 16),
-          Text(
-            'Seleziona una spesa',
-            style: TextStyle(fontSize: 16, color: Colors.grey[400]),
-          ),
+          Text('Seleziona una spesa', style: TextStyle(fontSize: 16, color: Colors.grey[400])),
           const SizedBox(height: 8),
-          Text(
-            'oppure aggiungine una nuova',
-            style: TextStyle(fontSize: 13, color: Colors.grey[350]),
-          ),
+          Text('oppure aggiungine una nuova', style: TextStyle(fontSize: 13, color: Colors.grey[350])),
         ],
       ),
     );
   }
 }
-
-// ---- Pannello dettaglio spesa (tablet) ----
 
 class SpesaDetailPanel extends StatelessWidget {
   final String spesaId;
@@ -263,16 +235,12 @@ class SpesaDetailPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<SpesaProvider>();
-    final spesa =
-        provider.spese.where((s) => s.id == spesaId).firstOrNull;
-
+    final spesa = provider.spese.where((s) => s.id == spesaId).firstOrNull;
     if (spesa == null) return const _DetailPlaceholder();
-
     final cat = provider.getCategoriaById(spesa.categoriaId);
-    final df = DateFormat('d MMMM yyyy', 'it_IT');
+    final df  = DateFormat('d MMMM yyyy', 'it_IT');
     final fmt = NumberFormat('#,##0.00', 'it_IT');
     final color = cat?.color ?? Colors.grey;
-
     return Scaffold(
       appBar: AppBar(
         title: Text(cat?.nome ?? 'Dettaglio'),
@@ -280,80 +248,41 @@ class SpesaDetailPanel extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Modifica',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => AggiungiSpesaScreen(spesaDaModificare: spesa),
-              ),
-            ),
+            onPressed: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => AggiungiSpesaScreen(spesaDaModificare: spesa))),
           ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Center(
-            child: Column(
-              children: [
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Icon(cat?.iconData ?? Icons.category,
-                      color: color, size: 36),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  '€ ${fmt.format(spesa.importo)}',
-                  style: TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-                Text(cat?.nome ?? '',
-                    style:
-                        TextStyle(fontSize: 16, color: Colors.grey[600])),
-              ],
+          Center(child: Column(children: [
+            Container(
+              width: 72, height: 72,
+              decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
+              child: Icon(cat?.iconData ?? Icons.category, color: color, size: 36),
             ),
-          ),
+            const SizedBox(height: 16),
+            Text('€ ${fmt.format(spesa.importo)}',
+              style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: color)),
+            Text(cat?.nome ?? '', style: TextStyle(fontSize: 16, color: Colors.grey[600])),
+          ])),
           const SizedBox(height: 32),
           const Divider(),
           const SizedBox(height: 16),
-          _DetailRow(
-            icon: Icons.calendar_today_outlined,
-            label: 'Data pagamento',
-            value: df.format(spesa.data),
-          ),
+          _DetailRow(icon: Icons.calendar_today_outlined,
+            label: 'Data pagamento', value: df.format(spesa.data)),
           if (spesa.competenzaInizio != null)
-            _DetailRow(
-              icon: Icons.date_range_outlined,
-              label: 'Competenza',
-              value:
-                  '${df.format(spesa.competenzaInizio!)} → ${df.format(spesa.competenzaFine!)}',
-            ),
+            _DetailRow(icon: Icons.date_range_outlined, label: 'Competenza',
+              value: '${df.format(spesa.competenzaInizio!)} → ${df.format(spesa.competenzaFine!)}'),
           if (spesa.kwh != null)
-            _DetailRow(
-              icon: Icons.bolt_outlined,
-              label: 'Consumo',
-              value: '${spesa.kwh!.toStringAsFixed(0)} kWh',
-            ),
+            _DetailRow(icon: Icons.bolt_outlined, label: 'Consumo',
+              value: '${spesa.kwh!.toStringAsFixed(0)} kWh'),
           if (spesa.canoneRai != null)
-            _DetailRow(
-              icon: Icons.tv_outlined,
-              label: 'Canone RAI',
-              value: '€ ${fmt.format(spesa.canoneRai!)}',
-            ),
+            _DetailRow(icon: Icons.tv_outlined, label: 'Canone RAI',
+              value: '€ ${fmt.format(spesa.canoneRai!)}'),
           if (spesa.note != null && spesa.note!.isNotEmpty)
-            _DetailRow(
-              icon: Icons.notes_outlined,
-              label: 'Note',
-              value: spesa.note!,
-            ),
+            _DetailRow(icon: Icons.notes_outlined, label: 'Note', value: spesa.note!),
         ],
       ),
     );
@@ -364,8 +293,7 @@ class _DetailRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  const _DetailRow(
-      {required this.icon, required this.label, required this.value});
+  const _DetailRow({required this.icon, required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -376,20 +304,14 @@ class _DetailRow extends StatelessWidget {
         children: [
           Icon(icon, size: 20, color: Colors.grey[500]),
           const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey[500],
-                        fontWeight: FontWeight.w500)),
-                const SizedBox(height: 2),
-                Text(value, style: const TextStyle(fontSize: 15)),
-              ],
-            ),
-          ),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[500], fontWeight: FontWeight.w500)),
+              const SizedBox(height: 2),
+              Text(value, style: const TextStyle(fontSize: 15)),
+            ],
+          )),
         ],
       ),
     );

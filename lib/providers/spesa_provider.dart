@@ -72,36 +72,100 @@ class SpesaProvider extends ChangeNotifier {
     }
   }
 
-  // ---- STATISTICHE ----
+  // ---- STATISTICHE PER COMPETENZA ----
 
-  double get totaleAnnoCorrente {
-    final anno = DateTime.now().year;
-    return _spese
-        .where((s) => s.data.year == anno)
-        .fold(0.0, (sum, s) => sum + s.importo);
+  /// Ripartisce una spesa sui mesi dell'anno [anno] in base al periodo
+  /// di competenza. Se non ha competenza, usa il mese di pagamento.
+  /// Restituisce una mappa mese -> quota di competenza.
+  Map<int, double> _ripartisciPerMese(spesa, int anno) {
+    final result = <int, double>{};
+
+    if (spesa.competenzaInizio == null || spesa.competenzaFine == null) {
+      // Nessuna competenza: attribuisci tutto al mese di pagamento se è nell'anno
+      if (spesa.data.year == anno) {
+        result[spesa.data.month] = spesa.importo;
+      }
+      return result;
+    }
+
+    final inizio = spesa.competenzaInizio!;
+    final fine = spesa.competenzaFine!;
+
+    // Durata totale in giorni della competenza
+    final durataGiorni = fine.difference(inizio).inDays + 1;
+    if (durataGiorni <= 0) return result;
+
+    // Scorri mese per mese nell'intervallo di competenza
+    DateTime cursore = DateTime(inizio.year, inizio.month, 1);
+    while (!cursore.isAfter(DateTime(fine.year, fine.month, 1))) {
+      if (cursore.year == anno) {
+        // Intersezione tra il mese corrente e il periodo di competenza
+        final meseInizio = DateTime(cursore.year, cursore.month, 1);
+        final meseFine = DateTime(cursore.year, cursore.month + 1, 1)
+            .subtract(const Duration(days: 1));
+
+        final overlapInizio =
+            inizio.isAfter(meseInizio) ? inizio : meseInizio;
+        final overlapFine = fine.isBefore(meseFine) ? fine : meseFine;
+
+        if (!overlapInizio.isAfter(overlapFine)) {
+          final giorniMese = overlapFine.difference(overlapInizio).inDays + 1;
+          final quota = spesa.importo * giorniMese / durataGiorni;
+          result[cursore.month] = (result[cursore.month] ?? 0) + quota;
+        }
+      }
+      // Avanza al mese successivo
+      cursore = DateTime(cursore.year, cursore.month + 1, 1);
+    }
+
+    return result;
   }
 
-  double get mediaMensileAnnoCorrente {
-    return totaleAnnoCorrente / 12;
+  /// Totale di competenza per un dato anno (somma quote di tutti i mesi)
+  double totaleAnnoPerCompetenza(int anno) {
+    double totale = 0;
+    for (final s in _spese) {
+      final quote = _ripartisciPerMese(s, anno);
+      totale += quote.values.fold(0.0, (a, b) => a + b);
+    }
+    return totale;
   }
 
-  Map<int, double> get totalePerCategoria {
-    final anno = DateTime.now().year;
+  double get totaleAnnoCorrente => totaleAnnoPerCompetenza(DateTime.now().year);
+
+  double get mediaMensileAnnoCorrente => totaleAnnoCorrente / 12;
+
+  /// Mappa mese -> importo di competenza per l'anno dato
+  Map<int, double> totalePerMeseCompetenza(int anno) {
     final map = <int, double>{};
-    for (final s in _spese.where((s) => s.data.year == anno)) {
-      map[s.categoriaId] = (map[s.categoriaId] ?? 0) + s.importo;
+    for (final s in _spese) {
+      final quote = _ripartisciPerMese(s, anno);
+      quote.forEach((mese, quota) {
+        map[mese] = (map[mese] ?? 0) + quota;
+      });
     }
     return map;
   }
 
-  Map<int, double> get totalePerMese {
-    final anno = DateTime.now().year;
+  /// Mappa categoriaId -> importo di competenza per l'anno dato
+  Map<int, double> totalePerCategoriaCompetenza(int anno) {
     final map = <int, double>{};
-    for (final s in _spese.where((s) => s.data.year == anno)) {
-      map[s.data.month] = (map[s.data.month] ?? 0) + s.importo;
+    for (final s in _spese) {
+      final quote = _ripartisciPerMese(s, anno);
+      final totaleSpesa = quote.values.fold(0.0, (a, b) => a + b);
+      if (totaleSpesa > 0) {
+        map[s.categoriaId] = (map[s.categoriaId] ?? 0) + totaleSpesa;
+      }
     }
     return map;
   }
+
+  // Kept for compatibility
+  Map<int, double> get totalePerCategoria =>
+      totalePerCategoriaCompetenza(DateTime.now().year);
+
+  Map<int, double> get totalePerMese =>
+      totalePerMeseCompetenza(DateTime.now().year);
 
   List<int> get anniDisponibili {
     final anni = _spese.map((s) => s.data.year).toSet().toList();
